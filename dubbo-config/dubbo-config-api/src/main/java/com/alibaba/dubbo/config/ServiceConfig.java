@@ -204,6 +204,11 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
             return;
         }
 
+
+        //延迟发布
+        //Executors.newSingleThreadScheduledExecutor(new NamedThreadFactory("DubboServiceDelayExporter", true))
+        //单位为TimeUnit.MILLISECONDS
+
         if (delay != null && delay > 0) {
             delayExportExecutor.schedule(new Runnable() {
                 public void run() {
@@ -349,23 +354,26 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         }
         unexported = true;
     }
-
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void doExportUrls() {
         //获取配置文件中配置的 注册 registry
         List<URL> registryURLs = loadRegistries(true);
 
+        //向所有的协议发布服务
         for (ProtocolConfig protocolConfig : protocols) {
             doExportUrlsFor1Protocol(protocolConfig, registryURLs);
         }
     }
 
+    // 服务发布到协议中
     private void doExportUrlsFor1Protocol(ProtocolConfig protocolConfig, List<URL> registryURLs) {
         String name = protocolConfig.getName();
         if (name == null || name.length() == 0) {
             name = "dubbo";
         }
 
+
+        //将所有的参数封装成Map对象
         Map<String, String> map = new HashMap<String, String>();
         map.put(Constants.SIDE_KEY, Constants.PROVIDER_SIDE);
         map.put(Constants.DUBBO_VERSION_KEY, Version.getVersion());
@@ -484,6 +492,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
 
             // export to local if the config is not remote (export to remote only when config is remote)
             if (!Constants.SCOPE_REMOTE.toString().equalsIgnoreCase(scope)) {
+                //本地发布协议
                 exportLocal(url);
             }
             // export to remote if the config is not local (export to local only when config is local)
@@ -526,8 +535,11 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                     .setProtocol(Constants.LOCAL_PROTOCOL)
                     .setHost(LOCALHOST)
                     .setPort(0);
+
+            //发布协议
             Exporter<?> exporter = protocol.export(
                     proxyFactory.getInvoker(ref, (Class) interfaceClass, local));
+
             exporters.add(exporter);
             logger.info("Export dubbo service " + interfaceClass.getName() + " to local registry");
         }
