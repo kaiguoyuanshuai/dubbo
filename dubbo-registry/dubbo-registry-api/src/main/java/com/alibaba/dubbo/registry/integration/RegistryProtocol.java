@@ -171,6 +171,7 @@ public class RegistryProtocol implements Protocol {
                 if (exporter == null) {
                     final Invoker<?> invokerDelegete = new InvokerDelegete<T>(originInvoker, getProviderUrl(originInvoker));
 
+                    //invokerDelegete -- > getUrl --> dubbo://xxxxxxx
                     //protocol Protocol$Adaptive extName= 'dubbo' = > ProtocolFilterWrapper(ProtocolListenerWrapper(DubboProtocol)) --> DubboProtocol.export() ;
                     exporter = new ExporterChangeableWrapper<T>((Exporter<T>) protocol.export(invokerDelegete), originInvoker);
                     bounds.put(key, exporter);

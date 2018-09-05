@@ -512,7 +512,10 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                         }
                         Invoker<?> invoker = proxyFactory.getInvoker(ref, (Class) interfaceClass, registryURL.addParameterAndEncoded(Constants.EXPORT_KEY, url.toFullString()));
                         DelegateProviderMetaDataInvoker wrapperInvoker = new DelegateProviderMetaDataInvoker(invoker, this);
+
+
                         //Protocol$Adaptive --> 取得 url开头的 RegistryProtocol -->  RegistryProtocol.export方法
+                        //第一个入口 RegistryProtocol.export()
                         Exporter<?> exporter = protocol.export(wrapperInvoker);
                         exporters.add(exporter);
                     }
