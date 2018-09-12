@@ -108,13 +108,25 @@ public class ExtensionLoader<T> {
         return type.isAnnotationPresent(SPI.class);
     }
 
+    /**
+     *
+     *  由于ExtensionLoader 默认私有化构造方法，所以需要提供一个 静态方法去初始化，并返回
+     *  ExtensionLoader private ExtensionLoader(Class<?> type)
+     * @param type 需要获取扩展的接口
+     * @param <T>
+     * @return
+     */
     @SuppressWarnings("unchecked")
     public static <T> ExtensionLoader<T> getExtensionLoader(Class<T> type) {
         if (type == null)
             throw new IllegalArgumentException("Extension type == null");
         if (!type.isInterface()) {
+            //如果不为接口的话 则抛出异常
             throw new IllegalArgumentException("Extension type(" + type + ") is not interface!");
         }
+
+        //判断是否是 注解了 SPI的接口
+
         if (!withExtensionSPIAnnotation(type)) {
             throw new IllegalArgumentException("Extension type(" + type +
                     ") is not extension, because WITHOUT @" + SPI.class.getSimpleName() + " Annotation!");
