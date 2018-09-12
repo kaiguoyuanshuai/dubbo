@@ -461,8 +461,9 @@ public class ExtensionLoader<T> {
     public T getAdaptiveExtension() {
 
         // private final Holder<Object> cachedAdaptiveInstance = new Holder<Object>()
-
+        //从本地缓存中取 ,在482行中设置进去的
         Object instance = cachedAdaptiveInstance.get();
+
         if (instance == null) {
             //private volatile Throwable createAdaptiveInstanceError
             if (createAdaptiveInstanceError == null) {
@@ -474,8 +475,9 @@ public class ExtensionLoader<T> {
                     //第一次进入
                     if (instance == null) {
                         try {
-                            //创建 扩展适配器类
+                            //返回自适应的适配器扩展对象
                             instance = createAdaptiveExtension();
+
                             //设置到 内存中
                             cachedAdaptiveInstance.set(instance);
                         } catch (Throwable t) {
@@ -587,7 +589,7 @@ public class ExtensionLoader<T> {
     }
 
     /**
-     * // 动态加载扩展点
+     * 动态加载扩展点
      */
     private Map<String, Class<?>> getExtensionClasses() {
         //private final Holder<Map<String, Class<?>>> cachedClasses = new Holder<Map<String, Class<?>>>()
@@ -612,10 +614,23 @@ public class ExtensionLoader<T> {
      */
     // synchronized in getExtensionClasses
     private Map<String, Class<?>> loadExtensionClasses() {
-        //获取注解对象
+
+
+         //type 是什么
+         // type 是 ExtensionLoader.getExtensionLoader(ExtensionFactory.class).getAdaptiveExtension() 中的 ExtensionFactory.class
+         /*
+          * 在 getExtensionLoader 中作为参数 传入到 构造函数中初始化的 参数
+          * private ExtensionLoader(Class<?> type) {
+          *  this.type = type;
+          * }
+         */
+
+
+        //获取注解对象 (ExtensionFactory.class 注解了 @SPI 上面的值 )
         final SPI defaultAnnotation = type.getAnnotation(SPI.class);
 
         if (defaultAnnotation != null) {
+
             //获取 SPI 注解上的值
             String value = defaultAnnotation.value();
 
@@ -628,17 +643,20 @@ public class ExtensionLoader<T> {
                             + ": " + Arrays.toString(names));
                 }
 
-                //设置默认的cachedDefaultName 名称
-
+                //设置默认的cachedDefaultName 名称 //TODO 标记一下哪里用到
                 if (names.length == 1) cachedDefaultName = names[0];
             }
         }
 
         Map<String, Class<?>> extensionClasses = new HashMap<String, Class<?>>();
         // 加载三个文件路径下
+        //META-INF/dubbo/internal/
         loadFile(extensionClasses, DUBBO_INTERNAL_DIRECTORY);
+        //META-INF/dubbo/
         loadFile(extensionClasses, DUBBO_DIRECTORY);
+        //META-INF/services/
         loadFile(extensionClasses, SERVICES_DIRECTORY);
+
         return extensionClasses;
     }
 
@@ -648,6 +666,7 @@ public class ExtensionLoader<T> {
      * @param dir
      */
     private void loadFile(Map<String, Class<?>> extensionClasses, String dir) {
+        //拼装成 文件路径
         String fileName = dir + type.getName();
         try {
             Enumeration<java.net.URL> urls;
@@ -657,6 +676,8 @@ public class ExtensionLoader<T> {
             } else {
                 urls = ClassLoader.getSystemResources(fileName);
             }
+
+            //获取到所有的 路径下含有该文件的内容
             if (urls != null) {
                 while (urls.hasMoreElements()) {
                     java.net.URL url = urls.nextElement();
@@ -664,18 +685,29 @@ public class ExtensionLoader<T> {
                         BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream(), "utf-8"));
                         try {
                             String line = null;
+                            //逐行加载配置
                             while ((line = reader.readLine()) != null) {
                                 final int ci = line.indexOf('#');
                                 if (ci >= 0) line = line.substring(0, ci);
                                 line = line.trim();
                                 if (line.length() > 0) {
+
+                                    //加载出一行之后进行处理
+
                                     try {
                                         String name = null;
+
+                                        //spring=com.alibaba.dubbo.config.spring.status.SpringStatusChecker
+                                        //通过 = 好进行拆分
                                         int i = line.indexOf('=');
                                         if (i > 0) {
+                                            //name = spring
+                                            //line = com.alibaba.dubbo.config.spring.status.SpringStatusChecker
+                                            //line 被替换成了 实现类的全路径
                                             name = line.substring(0, i).trim();
                                             line = line.substring(i + 1).trim();
                                         }
+                                        //实现类的全路径不为空
                                         if (line.length() > 0) {
                                             Class<?> clazz = Class.forName(line, true, classLoader);
 
@@ -687,29 +719,55 @@ public class ExtensionLoader<T> {
                                             }
 
                                             //判断类注解了@Adaptive 如果是 设置到 cachedAdaptiveClass 中
+
+                                            //如果@Adaptive 注解到类上 表示 该对象为自适应扩展点 ，就不会通过动态字节码的方式去扩展
+
+                                            //这边结束循环之后， getAdaptiveExtension() 默认会返回该对象
+
                                             if (clazz.isAnnotationPresent(Adaptive.class)) {
                                                 if (cachedAdaptiveClass == null) {
                                                     cachedAdaptiveClass = clazz;
                                                 } else if (!cachedAdaptiveClass.equals(clazz)) {
+                                                    //如果超过一个@Adaptive 则会抛出异常信息
                                                     throw new IllegalStateException("More than 1 adaptive class found: "
                                                             + cachedAdaptiveClass.getClass().getName()
                                                             + ", " + clazz.getClass().getName());
                                                 }
                                             } else {
-                                                //如果类上没有注解了@Adaptive
+                                                //如果类上没有注解了@Adaptive ,则会通过动态字节码进行创建自适应的扩展点 则会动态创建字节码文件 XXXX$Adaptive.java --> .class --> load
                                                 try {
 
                                                     //当配置文件中的每一个类的构造器是type类型的时候 会进行wapper
+
+                                                    // 表示 实现类中 如果有构造函数 是 接口类型 （Protocol）
+                                                    // public XXXXProtocol(Protocol Protocol){
+                                                    //  ....
+                                                    // }
+
+
+                                                    //这里该有一个骚操作 如果 claszz 没有  构造器为type参数的话 ，则会抛出异常NoSuchMethodException ，在catch 中接来下逻辑处理
+
                                                     clazz.getConstructor(type);
+
+                                                    //这个骚操作 只是想判断一下  cachedWrapperClasses 是否为空 ，如果为空则 初始化一个 ConcurrentHashSet 然后再add claszz
                                                     Set<Class<?>> wrappers = cachedWrapperClasses;
                                                     if (wrappers == null) {
                                                         cachedWrapperClasses = new ConcurrentHashSet<Class<?>>();
                                                         wrappers = cachedWrapperClasses;
                                                     }
+                                                    //添加到 wrappers 中
                                                     wrappers.add(clazz);
+
+
                                                 } catch (NoSuchMethodException e) {
+
+                                                    //如果没有无惨构建函数 ，则继续抛出异常
                                                     clazz.getConstructor();
+                                                    //spring=com.alibaba.dubbo.config.spring.status.SpringStatusChecker
+                                                    //这里的name 继续表示 [spring]
                                                     if (name == null || name.length() == 0) {
+
+                                                        //name 变成  clazz全路径去掉类名
                                                         name = findAnnotationName(clazz);
                                                         if (name == null || name.length() == 0) {
                                                             if (clazz.getSimpleName().length() > type.getSimpleName().length()
@@ -783,8 +841,8 @@ public class ExtensionLoader<T> {
     private T createAdaptiveExtension() {
         try {
             //先看 getAdaptiveExtensionClass() 方法
-            //TODO 这里只看了getAdaptiveExtensionClass方法
-
+            //1、获取到自适应扩展的类，然后再newInstance 实例化
+            //2、 注入
             return injectExtension((T) getAdaptiveExtensionClass().newInstance());
         } catch (Exception e) {
             throw new IllegalStateException("Can not create adaptive extension " + type + ", cause: " + e.getMessage(), e);
@@ -807,7 +865,7 @@ public class ExtensionLoader<T> {
             return cachedAdaptiveClass; //直接返回@Adaptive 注解的扩展类
         }
 
-        //创建适配器扩展的Class类
+        //如果不是@Adaptive的注解类，则通过动态字节码的方式 创建适配器扩展的Class类
         return cachedAdaptiveClass = createAdaptiveExtensionClass(); //创建动态字节码的类
     }
 
