@@ -3,7 +3,8 @@ package com.alibaba;
 /*
  * 描述:
  * @auth zhengkk19738
- * @time 2018/9/12
+ * @time 2018/9/13
  */
-public class NongFu implements Persion {
+@MokeSPI
+public interface Persion {
 }
